@@ -1,0 +1,40 @@
+﻿<Properties GitUserInfo="UsingGIT" StartupConfiguration="{1A90C0EC-411B-4AE3-B2C1-368495E03F68}|Default">
+  <MonoDevelop.Ide.Workbench ActiveDocument="PolyglotToolVer2/Pages/Dailytransactions.razor">
+    <Files>
+      <File FileName="PolyglotToolVer2/appsettings.json" Line="13" Column="2" />
+      <File FileName="PolyglotToolVer2/Pages/_Host.cshtml" Line="20" Column="110" />
+      <File FileName="PolyglotToolVer2/Pages/Index.razor" Line="14" Column="55" />
+      <File FileName="PolyglotToolVer2/Shared/NavMenu.razor" Line="16" Column="55" />
+      <File FileName="PolyglotToolVer2/Program.cs" Line="18" Column="1" />
+      <File FileName="PolyglotToolVer2/Pages/Newvoucher.razor" Line="93" Column="13" />
+      <File FileName="PolyglotToolVer2/Pages/Elta.razor" Line="56" Column="56" />
+      <File FileName="PolyglotToolVer2/Data/Models/Sales.cs" Line="19" Column="42" />
+      <File FileName="PolyglotToolVer2/Data/Models/eltaList.cs" Line="6" Column="44" />
+      <File FileName="PolyglotToolVer2/Pages/Dailytransactions.razor" Line="11" Column="39" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="PolyglotToolVer2" expanded="True">
+            <Node name="PolyglotToolVer2" expanded="True">
+              <Node name="Data" expanded="True">
+                <Node name="Models" expanded="True" />
+              </Node>
+              <Node name="Pages" expanded="True">
+                <Node name="Dailytransactions.razor" selected="True" />
+              </Node>
+              <Node name="Shared" expanded="True" />
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+  <MonoDevelop.Ide.ItemProperties.PolyglotToolVer2 PreferredExecutionTarget="/Applications/Safari.app" />
+</Properties>

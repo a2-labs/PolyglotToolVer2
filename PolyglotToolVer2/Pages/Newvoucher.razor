@@ -1,0 +1,190 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Configuration
+@using MudBlazor
+@using System.Globalization
+@using System.Data
+@using PolyglotToolVer2.Data
+@using System.Reflection
+
+@page "/newvoucher"
+
+@inject ISnackbar Snackbar
+@inject classSQL sql
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="4">
+        <MudDatePicker Label="Ημερομήνία Παραστατικών" @bind-Date="date" DateFormat="dd/MM/yyyy" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="showTransactions">ΕΜΦΑΝΙΣΗ</MudButton>
+        @if (Elements.Count != 0)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Tertiary" OnClick="clearGrid">Καθαρισμός</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="sendVoucher">Αποστολή Voucher</MudButton>
+        }
+    </MudItem>
+   
+</MudGrid>
+
+@if (Elements.Count != 0)
+{
+<MudTable Items="@Elements" Hover="true" Bordered="true" Striped="true" ReadOnly="true" Filter="new Func<PolyglotToolVer2.Data.Models.Sales,bool>(FilterFunc)" @bind-SelectedItem="selectedItem">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Λίστα Παραστατικών της @documentsDate.ToString("dd/MM/yyyy")</MudText>
+        <MudToolBarSpacer />
+        <MudTextField @bind-Value="searchString" Placeholder="Αναζήτηση" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Επιλογή</MudTh>
+        <MudTh>Παραστατικό</MudTh>
+        <MudTh>Αριθμός</MudTh>
+        <MudTh>Επωνυμία</MudTh>
+        <MudTh>Σύνολο</MudTh>
+        <MudTh>Τρόπος Πληρωμής</MudTh>
+        <MudTh>Voucher</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Επιλογή">
+            <MudCheckBox @bind-Checked="@context.check" Color="Color.Primary" ReadOnly="false"></MudCheckBox>
+        </MudTd>
+        <MudTd DataLabel="Παραστατικό">@context.document</MudTd>
+        <MudTd DataLabel="Αριθμός">@context.number</MudTd>
+        <MudTd DataLabel="Επωνυμία">@context.name</MudTd>
+        <MudTd DataLabel="Σύνολο">@context.total</MudTd>
+        <MudTd DataLabel="Τρόπος Πληρωμής">@context.payment</MudTd>
+        <MudTd DataLabel="Voucher">@context.voucher</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+}
+
+@code {
+    DateTime? date = DateTime.Today;
+    DateTime documentsDate;
+    private string searchString = "";
+    private const string companyId = "1";
+    private PolyglotToolVer2.Data.Models.Sales selectedItem = null;
+    private HashSet<PolyglotToolVer2.Data.Models.Sales> selectedItems = new HashSet<PolyglotToolVer2.Data.Models.Sales>();
+    private List<PolyglotToolVer2.Data.Models.Sales> Elements = new List<PolyglotToolVer2.Data.Models.Sales>();
+
+    private bool FilterFunc(PolyglotToolVer2.Data.Models.Sales element)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (element.document.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.payment.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if ($"{element.number} {element.total} {element.voucher}".Contains(searchString))
+            return true;
+        return false;
+    }
+
+    private void clearGrid()
+    {
+        date = DateTime.Today;
+        Elements.Clear();
+    }
+
+    private void sendVoucher()
+    {
+        int selectedVoucher = 0;
+        foreach (var item in Elements)
+        {
+            if (item.check == true)
+            {
+                selectedVoucher++;
+            }
+        }
+        if (selectedVoucher == 0)
+        {
+            Snackbar.Add("Δεν έχετε επιλέξει κανένα παραστατικό", Severity.Warning);
+            return;
+        }
+        Snackbar.Add($"Έχετε επιλέξει {selectedVoucher} παραστατικά", Severity.Normal);
+
+
+        foreach (var item in Elements)
+        {
+            if (item.check == true)
+            {
+                string voucher = item.voucher;
+                if (string.IsNullOrEmpty(voucher))
+                {
+                    string ReceiverName = item.name;
+                    string ReceiverAddress = item.AddressPel;
+                    string ReceiverCity = item.CityPel;
+                    string ReceiverPostal = item.ZipPel;
+                    string ReceiverTelephone = item.TelPel;
+                    string Notes = item.notes;
+                    string OrderID = item.number.ToString();
+                    string Cod = "";
+                    if (item.payment == "Πληρωμή με αντικαταβολή")
+                    {
+                        Cod = item.total.ToString().Replace(",", ".");
+                    }
+                    string weight = "1";
+
+                    if (ReceiverName.Length > 150) ReceiverName = ReceiverName.Substring(0, 150);
+                    if (ReceiverAddress.Length > 150) ReceiverAddress = ReceiverAddress.Substring(0, 150);
+                    if (ReceiverCity.Length > 40) ReceiverCity = ReceiverCity.Substring(0, 40);
+                    if (ReceiverPostal.Length > 5) ReceiverPostal = ReceiverPostal.Substring(0, 5);
+                    if (ReceiverTelephone.Length > 10) ReceiverTelephone = ReceiverTelephone.Substring(0, 10);
+                    if (Notes.Length > 100) Notes = Notes.Substring(0, 100);
+                    if (OrderID.Length > 13) OrderID = OrderID.Substring(0, 13);
+
+                }
+            }
+        }
+    }
+
+    private void showTransactions()
+    {
+        Elements.Clear();
+        documentsDate = date ?? DateTime.Now;
+        string fiscalId = findFiscalID(documentsDate.ToString("yyyy"));
+        string emp016 = $"E{companyId}_Emp016_{fiscalId}";
+
+        string query = $"select kwd,DatePar,PerigrafhPar ,ArPar, PerPel ,SynTeliko ,PerPlhromis ,parat3,AddressPel,CityPel,ZipPel,TelPel from {emp016} where EidosTimologhshs < 3 and kwdpar in (1,2,14) and datepar = '{documentsDate.ToString("yyyy-MM-dd")}' Order by kwd desc";
+        DataTable documentsList = sql.readTableFromSql(query);
+        if (documentsList == null || documentsList.Rows.Count == 0)
+        {
+            Snackbar.Add($"Δεν υπάρχουν κινήσεις {documentsDate.ToString("dd/MM/yyyy")}", Severity.Warning);
+            return;
+        }
+        Snackbar.Add($"Βρέθηκαν {documentsList.Rows.Count} Κινήσεις", Severity.Normal);
+
+        for (int i = 0; i < documentsList.Rows.Count; i++)
+        {
+            PolyglotToolVer2.Data.Models.Sales sale = new Data.Models.Sales();
+            sale.kwd = documentsList.Rows[i]["kwd"].ToString();
+            sale.date = Convert.ToDateTime(documentsList.Rows[i]["DatePar"].ToString());
+            sale.document = documentsList.Rows[i]["PerigrafhPar"].ToString();
+            sale.number = Convert.ToInt32(documentsList.Rows[i]["ArPar"].ToString());
+            sale.name = documentsList.Rows[i]["PerPel"].ToString();
+            sale.total = Convert.ToDouble(documentsList.Rows[i]["SynTeliko"].ToString());
+            sale.payment = documentsList.Rows[i]["PerPlhromis"].ToString();
+            sale.AddressPel = documentsList.Rows[i]["AddressPel"].ToString();
+            sale.CityPel = documentsList.Rows[i]["CityPel"].ToString();
+            sale.ZipPel = documentsList.Rows[i]["ZipPel"].ToString();
+            sale.TelPel = documentsList.Rows[i]["TelPel"].ToString();
+            sale.notes = documentsList.Rows[i]["parat1"].ToString();
+            sale.voucher = documentsList.Rows[i]["parat3"].ToString();
+            Elements.Add(sale);
+        }
+
+
+    }
+
+    private string findFiscalID(string year)
+    {
+        string result = null;
+        string query = $"Select id from emp998 where idEtairias = {companyId} and name = '{year}'";
+        result = sql.findField(query);
+        return result;
+    }
+}

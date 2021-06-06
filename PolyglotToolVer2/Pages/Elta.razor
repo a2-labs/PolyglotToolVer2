@@ -1,0 +1,317 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Configuration
+@using MudBlazor
+@using System.Globalization
+@using System.Data
+@using PolyglotToolVer2.Data
+
+
+
+@page "/elta"
+
+@inject ISnackbar Snackbar
+@inject classSQL sql
+
+<InputFile id="fileInput112" OnChange="UploadFiles" hidden accept=".csv" />
+<MudPaper Class="pa-16 ma-2" Elevation="0" style="width: auto; padding: 10px;">
+    <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Filled.CloudUpload"
+               Disabled="@disableUploadButton" style="float: left;margin: 5px;" for="fileInput112">
+        ανοιγμα αρχείου ελτα Courier
+    </MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Filled.Delete" OnClick="clearScreen"
+               style="margin: 5px;">
+        Καθαρισμος
+    </MudButton>
+    @if (showUpdateButton)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Filled.Update" OnClick="insertPayments"
+                   style="margin: 5px;">
+            Ενημερωση
+        </MudButton>
+    }
+    @if (showProgress)
+    {
+        <MudProgressLinear Color="Color.Primary" Value="@Progress" Max="@ProgressMax" Class="my-7" />
+    }
+</MudPaper>
+
+@if (Elements.Count != 0)
+{
+    <MudTable Items="@Elements" Hover="true" Bordered="true" Striped="true" ReadOnly="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Λίστα πληρωμών ΕΛΤΑ Courier</MudText>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Ενημερώθηκε</MudTh>
+            <MudTh>Voucher</MudTh>
+            <MudTh>Ποσό</MudTh>
+            <MudTh>Ημερομηνία</MudTh>
+            <MudTh>Όνομα</MudTh>
+            <MudTh>Παρατηρήσεις</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Ενημερώθηκε">
+                <MudCheckBox @bind-Checked="@context.updated" Color="Color.Primary" ReadOnly="true"></MudCheckBox>
+            </MudTd>
+            <MudTd DataLabel="Voucher">@context.voucher</MudTd>
+            <MudTd DataLabel="Ποσό">@context.amount</MudTd>
+            <MudTd DataLabel="Ημερομηνία">@context.date</MudTd>
+            <MudTd DataLabel="Όνομα">@context.name</MudTd>
+            <MudTd DataLabel="Παρατηρήσεις">@context.result</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+
+<MudDialog @bind-IsVisible="visible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Class="mr-3" /> Ημερομηνία Πληρωμής
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudDatePicker Label="Επιλέξτε Ημερομηνία πληρωμής" @bind-Date="paymentDate" Culture="culInfo" DateFormat="dd-MM-yyyy" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code
+{
+    CultureInfo culInfo = new CultureInfo("el-GR");
+    bool showUpdateButton = false;
+    bool disableUploadButton = false;
+    bool showProgress = false;
+    private List<PolyglotToolVer2.Data.Models.eltaList> Elements = new List<PolyglotToolVer2.Data.Models.eltaList>();
+    public int Progress { get; set; }
+    public int ProgressMax { get; set; }
+    private bool visible = false;
+    DateTime? paymentDate = DateTime.Today;
+    private bool wait2getDate = true;
+    protected override void OnInitialized()
+    {
+    }
+
+
+    private async void UploadFiles(InputFileChangeEventArgs e)
+    {
+        showUpdateButton = false;
+        Elements.Clear();
+        var entries = e.GetMultipleFiles();
+        //Do your validations here
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+
+        IBrowserFile fileName = entries.FirstOrDefault();
+        var buffers = new byte[fileName.Size];
+        await fileName.OpenReadStream().ReadAsync(buffers);
+
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        string result = System.Text.Encoding.GetEncoding(1253).GetString(buffers);
+        string[] lines = result.ToString().Split("\n");
+
+        foreach (string line in lines)
+        {
+            string[] lineDetails = line.Split(";");
+            if (lineDetails.Count() >= 4)
+            {
+                PolyglotToolVer2.Data.Models.eltaList list = new PolyglotToolVer2.Data.Models.eltaList();
+                list.voucher = lineDetails[0].ToString();
+                list.name = lineDetails[3].ToString();
+                double amount = 0;
+                string amountStr = lineDetails[1].ToString();
+                double.TryParse(amountStr, NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out amount);
+                list.amount = amount;
+                list.date = lineDetails[2].ToString();
+                list.updated = false;
+                Elements.Add(list);
+            }
+        }
+        showUpdateButton = true;
+        StateHasChanged();
+        Snackbar.Add($"Το αρχείο {fileName.Name} έχει φορτωθεί");
+
+    }
+
+    private void clearScreen()
+    {
+        Elements.Clear();
+        showUpdateButton = false;
+        disableUploadButton = false;
+        showProgress = false;
+    }
+
+    private async void insertPayments()
+    {
+        if (Elements.Count == 0)
+        {
+            return;
+        }
+        disableUploadButton = true;
+        showUpdateButton = false;
+        showProgress = true;
+        wait2getDate = false;
+        GetDate();
+        while (!wait2getDate)
+        {
+            await Task.Delay(250); // pause for 1/4 second;
+        };
+
+        Snackbar.Add($"Ημερομηνία πληρωμής {paymentDate?.ToString("dd-MM-yyyy")}");
+        ProgressMax = Elements.Count;
+        Progress = Elements.Count;
+        bool copleteNormal = true;
+        for (int i = 0; i < Elements.Count; i++)
+        {
+            string voucher = Elements[i].voucher;
+            double amount = Elements[i].amount;
+            DateTime documentDate = DateTime.ParseExact(Elements[i].date, "d/M/yyyy", CultureInfo.InvariantCulture);
+            Tuple<bool, string> writeResult = updatePayment2Prisma(voucher, amount, documentDate);
+            if (!writeResult.Item1) copleteNormal = false;
+            Elements[i].updated = writeResult.Item1;
+            Elements[i].result = writeResult.Item2;
+            Progress = i + 1;
+            StateHasChanged();
+        }
+        disableUploadButton = false;
+        showProgress = false;
+        if (copleteNormal)
+        {
+            Snackbar.Add("Ολοκληρώθηκε η ενημέρωση των πληρωμών");
+        }
+        else
+        {
+            Snackbar.Add("Ολοκληρώθηκε η ενημέρωση των πληρωμών\nΠροσοχή υπάρχουν λάθη");
+        }
+        StateHasChanged();
+    }
+
+    private Tuple<bool, string> updatePayment2Prisma(string voucher, double amount, DateTime documentDate)
+    {
+        //Console.Write("\nstart Tuple");
+        Tuple<bool, string> result = new Tuple<bool, string>(false, null);
+        string year = documentDate.ToString("yyyy");
+        string query;
+        string fiscalId = findFiscalID(year);
+        string emp016 = $"E1_Emp016_{fiscalId}";
+        string emp016ForWrite = emp016;
+        if (paymentDate?.ToString("yyyy") != year)
+        {
+            fiscalId = findFiscalID(paymentDate?.ToString("yyyy"));
+            emp016ForWrite = $"E1_Emp016_{fiscalId}";
+        }
+        //Ψάχνουμε για το παραστατικό
+        query = $"select a.kwd,a.parat3,a.PerPel,a.SynTeliko,a.arpar,b.arpar ArParApod,a.kwdPel,a.PerPel,a.AfmPel,a.CityPel,a.AddressPel,a.ZipPel,a.KwdEpagPel,a.PerEpagPel,a.DoyPel,a.TelPel,a.Kepyo,a.Proorismos,a.kwdPar from {emp016} as a left join (select * from {emp016ForWrite} where eidostimologhshs = 5 and parat3 = '{voucher}') as b on b.parat3 = a.parat3 where a.parat3 = '{voucher}'";
+        DataTable table16 = sql.readTableFromSql(query);
+        if (table16 == null || table16.Rows.Count == 0)
+        {
+            result = new Tuple<bool, string>(false, $"Το Voucher δεν βρέθηκε στα παραστατικά της χρήσης {year}");
+            Console.Write($"\nΤο Voucher δεν βρέθηκε στα παραστατικά της χρήσης {year}");
+        }
+        else
+        {
+            string kwdPel = table16.Rows[0]["kwdPel"].ToString();
+            string PerPel = table16.Rows[0]["PerPel"].ToString();
+            string AfmPel = table16.Rows[0]["AfmPel"].ToString();
+            string CityPel = table16.Rows[0]["CityPel"].ToString();
+            string AddressPel = table16.Rows[0]["AddressPel"].ToString();
+            string ZipPel = table16.Rows[0]["ZipPel"].ToString();
+            string KwdEpagPel = table16.Rows[0]["KwdEpagPel"].ToString();
+            string PerEpagPel = table16.Rows[0]["PerEpagPel"].ToString();
+            string DoyPel = table16.Rows[0]["DoyPel"].ToString();
+            string TelPel = table16.Rows[0]["TelPel"].ToString();
+            string Kepyo = table16.Rows[0]["Kepyo"].ToString();
+            string Proorismos = table16.Rows[0]["Proorismos"].ToString();
+            string kwdPar = table16.Rows[0]["kwdPar"].ToString();
+
+            // Γράφουμε το παρασττικό
+            if (table16.Rows.Count == 1)
+            {
+                double tempAmount = Convert.ToDouble(table16.Rows[0]["SynTeliko"].ToString());
+                //Console.Write($"\namount={amount} = tempAmount={tempAmount}");
+                if (table16.Rows[0]["ArParApod"] != null && !string.IsNullOrEmpty(table16.Rows[0]["ArParApod"].ToString()))
+                {
+                    result = new Tuple<bool, string>(false, $"Έχει κοπή απόδειξη No {table16.Rows[0]["ArParApod"].ToString()} για το Voucher {voucher} στην χρήση {paymentDate?.ToString("yyyy")}.");
+                }
+                else
+                {
+                    if (amount == tempAmount)
+                    {
+                        writeApod(emp016ForWrite, amount.ToString().Replace(",", "."), paymentDate?.ToString("yyyy-MM-dd"), voucher, kwdPel, PerPel, AfmPel, CityPel, AddressPel, ZipPel, KwdEpagPel, PerEpagPel, DoyPel, TelPel, Kepyo, Proorismos, kwdPar);
+                        result = new Tuple<bool, string>(true, $"OK");
+                    }
+                    else
+                    {
+                        writeApod(emp016ForWrite, amount.ToString().Replace(",", "."), paymentDate?.ToString("yyyy-MM-dd"), voucher, kwdPel, PerPel, AfmPel, CityPel, AddressPel, ZipPel, KwdEpagPel, PerEpagPel, DoyPel, TelPel, Kepyo, Proorismos, kwdPar);
+                        result = new Tuple<bool, string>(true, $"Υπάρχει διαφορά στα ποσά\nΠαραστατικό:{tempAmount.ToString()} ΕΛΤΑ: {amount.ToString()}");
+                    }
+                }
+            }
+            else
+            {
+                //Το Voucher Βρέθηκε σε πολλά παραστατικά.
+                result = new Tuple<bool, string>(false, $"Το Voucher Βρέθηκε σε πολλά παραστατικά.");
+            }
+        }
+
+        return result;
+    }
+
+    private void writeApod(string emp016ForWrite, string amount, string date, string voucher, string kwdPel, string PerPel, string AfmPel, string CityPel, string AddressPel, string ZipPel, string KwdEpagPel, string PerEpagPel, string DoyPel, string TelPel, string Kepyo, string Proorismos, string kwdPar)
+    {
+
+        string KwdTameiou = "05";
+        string parat1 = "πελάτης Λιανικής ΕΛΤΑ";
+        if (kwdPar == "1")
+        {
+            parat1 = "ΕΛΤΑ";
+        }
+        string query = $"Select isnull(Max(Kwd)+1,1) from {emp016ForWrite}";
+        string kwd = sql.findField(query);
+        query = $"Select isnull(Max(Arpar)+1,1) from {emp016ForWrite} where SeiraPar='ΕΛΤΑ'";
+        string arpar = sql.findField(query);
+        query = $"Insert into {emp016ForWrite} (synteliko,synoloForouEidwn,Apoqxoros,SecApoqXoros,kwdpoliti,promithiaPolEIS,promithiaPolETZ,checkpoint1,checkpoint2,nomisma,isotimia,kwdEndodiakinisis,kwdAkyrwmenou,kwdKinParagwghs,IdAxiografou,kwdTameiou,EisPlhr_Aksiografa,tritosKwd,TritosCompany, " +
+                       "TritosAFM,TritosDOy,TritosAddr,TritosCity,tritosTK,TritosRecType,Logistikopoihsh,IdEispr,HfaistosFlag,AnoikthAxia,KwdKinEisagoghs,syntelikoks,EisPlhr_AksiografaKs,CancellationReason,EmpUserName,MyfExported,ArIsotimias,PrYpolKS,EkptoshNomKS, " +
+                       "synEkptvshsKS,AxiaProEkptKS,AxiaMetaEkptKS,SynFPAKS,SynEpibKS,FPAEPIBKS,SynGenikoKS,SynoloForouEidwnKS,EksoflimenoPosoKS,PromithiaPolEiSKS,PromithiaPolETZKS,dapanesMhEkp,ApallaktikoFPA,kwd,IDPAR,KwdPar,PerigrafhPar,DatePar,TimePar,SeiraPar,ArPar,KwdPlhromis, " +
+                       "PerPlhromis,Pel,Apo,PelProm,EidosTimologhshs,parat1,parat2,parat3,kwdPel,PerPel,AfmPel,CityPel,AddressPel,ZipPel,KwdEpagPel,PerEpagPel,DoyPel,TelPel,Kepyo,PrYpol,Proorismos) " +
+                      $"Values({amount},0,'000','000','',0,0,0,0,'EURO',1,-1,-1,-1,-1,'{KwdTameiou}',0,'','','','','','','',0,0,-1,0,{amount},-1,0,0,'',1,0,'',0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,{kwd}," +
+                      $"18,900,'ΑΠΟΔΕΙΞΗ ΕΙΣΠΡΑΞΗΣ','{date}','1899-12-30 16:13:00.000','ΕΛΤΑ',{arpar},'','','-',0,1,5,'{parat1}','','{voucher}','{kwdPel}','{PerPel}','{AfmPel}','{CityPel}','{AddressPel}','{ZipPel}','{KwdEpagPel}','{PerEpagPel}','{DoyPel}','{TelPel}',{Kepyo},0,'{Proorismos}' )";
+        sql.writeSQL(query);
+        query = "INSERT INTO [dbo].[EltaPayments] ([amount] ,[date] ,[voucher] ,[kwdPel] ,[PerPel] ,[arpar] ,[printed],[parat1],[parat2],[parat3]) " +
+               $"VALUES ('{amount}' ,'{date}' , '{voucher}', '{kwdPel}', '{PerPel}' ,'{arpar}', 0, '{parat1}','','{voucher}')";
+        sql.writeSQL(query, "A2PaymentsDB");
+    }
+
+    void Change_EventArgs(object sender, EventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private string findFiscalID(string year)
+    {
+        string result = null;
+        string query = $"Select id from emp998 where idEtairias = 1 and name = '{year}'";
+        result = sql.findField(query);
+        return result;
+    }
+
+    void Submit()
+    {
+        visible = false;
+        wait2getDate = true;
+    }
+
+    private void GetDate()
+    {
+        visible = true;
+    }
+
+    private void PrintReceipt()
+    {
+
+    }
+
+
+}

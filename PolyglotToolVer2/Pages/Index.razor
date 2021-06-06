@@ -1,0 +1,42 @@
+﻿@page "/"
+
+@using Data
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+
+<img src="/Images/polyglot.png" alt="Paris" style="display: block; margin-left: auto; margin-right: auto; width: 135px">
+
+<MudText Typo="Typo.h2" Align="Align.Center">Διάφορα χρήσιμα εργαλεία για το<br />Polyglot Bookstore</MudText>
+<MudPaper Width="300px" style="display: block;margin-top:3rem; margin-left: auto; margin-right: auto; width: 300px"
+          Elevation="3">
+    <MudList>
+        <MudListItem Icon="@Icons.Filled.LocalShipping" style="padding: 5px;">
+            1. Έκδοση voucher ΕΛΤΑ
+        </MudListItem>
+        <MudListItem Icon="@Icons.Filled.Euro" style="padding: 5px;">
+            2. Πληρωμές ΕΛΤΑ Courier
+        </MudListItem>
+        <MudListItem Icon="@Icons.Filled.Euro" style="padding: 5px;">
+            3. Πληρωμές E-POS
+        </MudListItem>
+        <MudListItem Icon="@Icons.Filled.Dashboard" style="padding: 5px;">
+            4. Κινήσεις Ημέρας
+        </MudListItem>
+        <MudListItem Icon="@Icons.Filled.AllInbox" style="padding: 5px;">
+            5. Ενημέρωση Απογραφής
+        </MudListItem>
+    </MudList>
+    <br />
+</MudPaper>
+<br />
+<MudText Typo="Typo.h6" Align="Align.Center">
+    Μπορείτε να επιλέξετε την εργασία που θέλετε από το
+    menu στα αριστερά
+</MudText>
+
+
+
+@code {
+
+}

@@ -1,0 +1,94 @@
+﻿@page "/dailytransactions"
+
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Configuration
+@using MudBlazor
+@using System.Globalization
+@using System.Data
+@using PolyglotToolVer2.Data
+
+@inject ISnackbar Snackbar
+@inject PolyglotToolVer2.Data.classSQL sql
+
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudPaper Class="pa-16 ma-2" Elevation="3">
+            <MudDateRangePicker @ref="_picker" Label="Επιλέξτε διάστημα" @bind-DateRange="_dateRange" DateFormat="dd/MM/yyyy">
+                <PickerActions>
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => _picker.Clear())">Καθαρισμος</MudButton>
+                    <MudButton OnClick="@(() => _picker.Close(false))">Ακυρωση</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => _picker.Close())">Επιλογη</MudButton>
+                </PickerActions>
+            </MudDateRangePicker>
+        </MudPaper>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="showTransactions">ΕΜΦΑΝΙΣΗ</MudButton>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+
+    </MudItem>
+</MudGrid>
+
+@code {
+    private const string companyId = "1";
+
+    //int selectedValue { get; set; } = 1;
+
+    List<Dictionary<string, object>> Data { get; set; } = new List<Dictionary<string, object>>();
+    int Total { get; set; }
+    bool ExportAllPages { get; set; } = true;
+
+    MudDateRangePicker _picker;
+    DateRange _dateRange = new DateRange(DateTime.Now.Date, DateTime.Now.Date);
+    DataTable tableTransactions { get; set; }
+
+    private void showTransactions()
+    {
+        DateTime fromDate = _dateRange.Start.Value;
+        DateTime toDate = _dateRange.End.Value;
+
+        string fiscalId = findFiscalID(fromDate.ToString("yyyy"));
+        string emp013 = $"E{companyId}_Emp013_{fiscalId}";
+        string emp016 = $"E{companyId}_Emp016_{fiscalId}";
+        string emp017 = $"E{companyId}_Emp017_{fiscalId}";
+        string emp123 = $"E{companyId}_Emp123_{fiscalId}";
+
+
+        Snackbar.Add($"Από Ημερομηνία {fromDate.ToString("dd-MM-yyyy")} έως {toDate.ToString("dd-MM-yyyy")}");
+
+        string query = $"SELECT DISTINCT ΗΜΕΡΟΜΗΝΙΑ, ΚΩΔΙΚΟΣ, ΠΕΡΙΓΡΑΦΗ, ΠΡΟΜΗΘΕΥΤΗΣ, ΕΚΔΟΤΗΣ, " +
+"                             (SELECT        SUM(quantity) AS Expr1 " +
+"                               FROM            (SELECT        Emp016.DatePar AS ΗΜΕΡΟΜΗΝΙΑ, Emp013.Kwd AS ΚΩΔΙΚΟΣ, Emp013.Perigrafh AS ΠΕΡΙΓΡΑΦΗ, Emp013.PromCompany AS ΠΡΟΜΗΘΕΥΤΗΣ, " +
+"                                                                                    Emp123.CustomField_2 AS ΕΚΔΟΤΗΣ, CASE WHEN [Emp017].[Apo] = '-' THEN [Emp017].[Posothta] WHEN [Emp017].[Apo] = '+' THEN (- 1)  " +
+"                                                                                   * [Emp017].[Posothta] END AS quantity " +
+$"                                                         FROM            dbo.{emp016} AS Emp016 INNER JOIN " +
+$"                                                                                   dbo.{emp017} AS Emp017 ON Emp016.Kwd = Emp017.Kwd INNER JOIN " +
+$"                                                                                   dbo.{emp013} AS Emp013 ON Emp017.KwdEidous = Emp013.Kwd INNER JOIN " +
+$"                                                                                   dbo.{emp123} AS Emp123 ON Emp013.ApoID = Emp123.IdRec " +
+"                                                         WHERE        (Emp017.Apo <> N'0') AND (Emp016.KwdPar <> 999) AND (Emp016.CheckPoint2 <> N'A') AND (Emp016.EidosTimologhshs < 3) AND  " +
+$"                                                                                  (CAST(Emp016.DatePar AS date) >= CAST('{fromDate.ToString("yyyy-MM-dd")}' AS date) AND" +
+$"                                                                                  (CAST(Emp016.DatePar AS date) <= CAST('{toDate.ToString("yyyy-MM-dd")}' AS date) " +
+"))) AS aaa " +
+"                               WHERE        (ΚΩΔΙΚΟΣ = tmp.ΚΩΔΙΚΟΣ)) AS ΠΟΣΟΤΗΤΑ, STOCK " +
+"FROM            (SELECT        Emp016.DatePar AS ΗΜΕΡΟΜΗΝΙΑ, Emp013.Kwd AS ΚΩΔΙΚΟΣ, Emp013.Perigrafh AS ΠΕΡΙΓΡΑΦΗ, Emp013.PromCompany AS ΠΡΟΜΗΘΕΥΤΗΣ,  " +
+"                                                    Emp123.CustomField_2 AS ΕΚΔΟΤΗΣ, CASE WHEN [Emp017].[Apo] = '-' THEN [Emp017].[Posothta] WHEN [Emp017].[Apo] = '+' THEN (- 1)  " +
+"                                                    * [Emp017].[Posothta] END AS quantity, Emp013.PrYpol + Emp013.Ypoloipo AS STOCK " +
+$"                          FROM            dbo.{emp016} AS Emp016 INNER JOIN " +
+$"                                                    dbo.{emp017} AS Emp017 ON Emp016.Kwd = Emp017.Kwd INNER JOIN " +
+$"                                                    dbo.{emp013} AS Emp013 ON Emp017.KwdEidous = Emp013.Kwd INNER JOIN " +
+$"                                                    dbo.{emp123} AS Emp123 ON Emp013.ApoID = Emp123.IdRec " +
+"                          WHERE        (Emp017.Apo <> N'0') AND (Emp016.KwdPar <> 999) AND (Emp016.CheckPoint2 <> N'A') AND (Emp016.EidosTimologhshs < 3) AND  " +
+$"                                                    (CAST(Emp016.DatePar AS date) >= CAST('{fromDate.ToString("yyyy-MM-dd")}' AS date) AND  " +
+$"                                                    (CAST(Emp016.DatePar AS date) <= CAST('{toDate.ToString("yyyy-MM-dd")}' AS date) " +
+"))) AS tmp ";
+        tableTransactions = sql.readTableFromSql(query);
+    }
+
+    private string findFiscalID(string year)
+    {
+        string result = null;
+        string query = $"Select id from emp998 where idEtairias = 1 and name = '{year}'";
+        result = sql.findField(query);
+        return result;
+    }
+}
+
